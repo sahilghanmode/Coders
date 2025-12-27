@@ -11,10 +11,13 @@ node_modules
 .env.development.local
 .env.test.local
 .env.production.local
-.confg
+.conf
 
 # Testing
 coverage
+
+judge0.confg
+services/primary-be/judge0.conf
 
 # Turbo
 .turbo
