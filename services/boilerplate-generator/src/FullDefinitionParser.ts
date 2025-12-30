@@ -48,7 +48,7 @@ export class FullDefinitionParser {
 
     generateCppFullBoilerplate(): string {
         const returnType = this.outputStructure.length === 1 ? this.outputStructure[0].type : 'void';
-        const params = this.inputStructure.map(i => `${i.type} ${i.name}`).join(', ');
+        const params = this.inputStructure.map(i => `${i.type}& ${i.name}`).join(', ');
 
         // Generate input reading code
         const inputReading = this.inputStructure.map(input => {
@@ -118,20 +118,28 @@ ${outputPrinting}
             `${i.name}: ${this.mapTypeToPython(i.type)}`
         ).join(', ');
 
-        // Generate input reading
+        // Generate input reading - FIXED to match C++ format
+        let lineIndex = 0;
         const inputReading = this.inputStructure.map(input => {
             if (input.type === 'int' || input.type === 'long') {
+                lineIndex++;
                 return `${input.name} = int(input())`;
             } else if (input.type === 'float' || input.type === 'double') {
+                lineIndex++;
                 return `${input.name} = float(input())`;
             } else if (input.type === 'string') {
+                lineIndex++;
                 return `${input.name} = input()`;
             } else if (input.type === 'vector<int>') {
-                return `${input.name} = list(map(int, input().split()))`;
+                lineIndex++; // Skip size line
+                lineIndex++; // Read array line
+                return `n_${input.name} = int(input())\n${input.name} = list(map(int, input().split()))`;
             } else if (input.type === 'vector<string>') {
-                return `${input.name} = input().split()`;
+                lineIndex++;
+                lineIndex++;
+                return `n_${input.name} = int(input())\n${input.name} = input().split()`;
             } else if (input.type === 'vector<vector<int>>') {
-                return `rows = int(input())\n${input.name} = [list(map(int, input().split())) for _ in range(rows)]`;
+                return `rows_${input.name}, cols_${input.name} = map(int, input().split())\n${input.name} = [list(map(int, input().split())) for _ in range(rows_${input.name})]`;
             }
             return `${input.name} = input()  # TODO: Add proper input parsing`;
         }).join('\n');
@@ -173,21 +181,35 @@ if __name__ == "__main__":
         
         const params = this.inputStructure.map(i => i.name).join(', ');
 
-        // Generate input reading
-        const inputReading = this.inputStructure.map((input, idx) => {
+        // Generate input reading - FIXED to properly handle line indices
+        let lineIndex = 0;
+        const inputReading = this.inputStructure.map((input) => {
             if (input.type === 'int' || input.type === 'long' || input.type === 'float' || input.type === 'double') {
-                return `const ${input.name} = parseInt(lines[${idx}]);`;
+                const code = `const ${input.name} = parseInt(lines[${lineIndex}]);`;
+                lineIndex++;
+                return code;
             } else if (input.type === 'string') {
-                return `const ${input.name} = lines[${idx}];`;
+                const code = `const ${input.name} = lines[${lineIndex}];`;
+                lineIndex++;
+                return code;
             } else if (input.type === 'vector<int>') {
-                return `const ${input.name} = lines[${idx}].split(' ').map(Number);`;
+                const sizeIndex = lineIndex;
+                const arrayIndex = lineIndex + 1;
+                lineIndex += 2; // Skip size and array lines
+                return `const n_${input.name} = parseInt(lines[${sizeIndex}]);\n    const ${input.name} = lines[${arrayIndex}].split(' ').map(Number);`;
             } else if (input.type === 'vector<string>') {
-                return `const ${input.name} = lines[${idx}].split(' ');`;
+                const sizeIndex = lineIndex;
+                const arrayIndex = lineIndex + 1;
+                lineIndex += 2;
+                return `const n_${input.name} = parseInt(lines[${sizeIndex}]);\n    const ${input.name} = lines[${arrayIndex}].split(' ');`;
             } else if (input.type === 'vector<vector<int>>') {
-                return `const rows = parseInt(lines[${idx}]);\nconst ${input.name} = [];\nfor(let i = 0; i < rows; i++) {\n    ${input.name}.push(lines[${idx + 1} + i].split(' ').map(Number));\n}`;
+                const dimIndex = lineIndex;
+                lineIndex++;
+                const code = `const [rows_${input.name}, cols_${input.name}] = lines[${dimIndex}].split(' ').map(Number);\n    const ${input.name} = [];\n    for(let i = 0; i < rows_${input.name}; i++) {\n        ${input.name}.push(lines[${lineIndex} + i].split(' ').map(Number));\n    }`;
+                return code;
             }
-            return `const ${input.name} = lines[${idx}];`;
-        }).join('\n');
+            return `const ${input.name} = lines[${lineIndex}];`;
+        }).join('\n    ');
 
         const paramNames = this.inputStructure.map(i => i.name).join(', ');
         const functionCall = returnType !== 'void' 
@@ -356,30 +378,17 @@ ${outputPrinting}
         }
     }
 }
+// ```
 
-if (require.main === module) {
-    const sampleStructure = `
-Problem Name: **Two Sum**
-Function Name: twoSum
-Input Structure:
-Input Field: vector<int> nums
-Input Field: int target
-Output Structure:
-Output Field: vector<int> result
-    `.trim();
+// **Key fixes:**
 
-    const parser = new FullDefinitionParser();
-    parser.parse(sampleStructure);
+// 1. ✅ **JavaScript line indexing**: Now properly tracks which line to read based on input structure (size line + array line for vectors)
+// 2. ✅ **Python input reading**: Fixed to match C++ format with size line before array
+// 3. ✅ **C++ parameter passing**: Added `&` for pass-by-reference for vectors
+// 4. ✅ **Consistent input format**: All languages now expect the same input format (size, then data)
 
-    console.log('========== C++ Full Boilerplate ==========');
-    console.log(parser.generateCppFullBoilerplate());
-    
-    console.log('\n========== Python Full Boilerplate ==========');
-    console.log(parser.generatePythonFullBoilerplate());
-    
-    console.log('\n========== JavaScript Full Boilerplate ==========');
-    console.log(parser.generateJavaScriptFullBoilerplate());
-    
-    console.log('\n========== Java Full Boilerplate ==========');
-    console.log(parser.generateJavaFullBoilerplate());
-}
+// Now your JavaScript boilerplate will correctly read:
+// ```
+// 4          // line 0: array size
+// 2 7 11 15  // line 1: array elements
+// 9          // line 2: target

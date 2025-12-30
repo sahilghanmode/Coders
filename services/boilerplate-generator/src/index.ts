@@ -17,6 +17,7 @@ function partialBoilerPlateGenerator(generatorFilePath:string){
     const cppCode=parser.generateCppBoilerplate();
     // const javaCode=parser.generateJavaBoilerplate();
     // const javaTestCode=parser.generateJavaTestBoilerplate();
+    const javascriptCode=parser.generateJavaScriptBoilerplate();
     const pythonCode=parser.generatePythonBoilerplate();
     
     if(!fs.existsSync(boilerplatePath)){
@@ -26,8 +27,7 @@ function partialBoilerPlateGenerator(generatorFilePath:string){
     fs.writeFileSync(path.join(boilerplatePath,'function.cpp'),cppCode);
     // fs.writeFileSync(path.join(boilerplatePath,'function.java'),javaCode);
     fs.writeFileSync(path.join(boilerplatePath,'function.py'),pythonCode);
-
-    console.log("boilerplate code generated successfully")
+    fs.writeFileSync(path.join(boilerplatePath,'function.js'),javascriptCode);
 }
 
 function fullBoilerPlateGenerator(generatorFilePath:string){
@@ -40,11 +40,23 @@ function fullBoilerPlateGenerator(generatorFilePath:string){
     const parser=new FullDefinitionParser();
     parser.parse(inputpath);
 
-    console.log(parser.generateJavaScriptFullBoilerplate());
+    const cppCode=parser.generateCppFullBoilerplate()
+    const pythonCode=parser.generatePythonFullBoilerplate();
+    const javascriptCode=parser.generateJavaScriptFullBoilerplate();
+
+    if(!fs.existsSync(fullboilerplatePath)){
+        fs.mkdirSync(fullboilerplatePath);
+    }
+
+    fs.writeFileSync(path.join(fullboilerplatePath,'function.cpp'),cppCode);
+    fs.writeFileSync(path.join(fullboilerplatePath,'function.py'),pythonCode);
+    fs.writeFileSync(path.join(fullboilerplatePath,'function.js'),javascriptCode);
+
+
 
     // console.log(inputpath)
 }
 
-// partialBoilerPlateGenerator('../../problems/1');
+partialBoilerPlateGenerator('../../problems/1');
 
 fullBoilerPlateGenerator('../../problems/1');
